@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AlertLogsController.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">agent-data-api</a> &gt; <a href="index.source.html" class="el_package">com.xdraiv.agentdata.alertLogs</a> &gt; <span class="el_source">AlertLogsController.kt</span></div><h1>AlertLogsController.kt</h1><pre class="source lang-java linenums">package com.xdraiv.agentdata.alertLogs
+
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.RestController
+
+@RestController
+@RequestMapping(&quot;/alertLogs&quot;)
+<span class="fc" id="L10">class AlertLogsController(private val repository: AlertLogsRepository) {</span>
+    @GetMapping(&quot;/search&quot;)
+    fun findAllAlertLogs(
+        @RequestParam(defaultValue = &quot;1&quot;) page: Int,
+        @RequestParam(defaultValue = &quot;20&quot;) size: Int,
+        @RequestParam(required = false) location: String?,
+        @RequestParam(required = false) fields: List&lt;String&gt;?,
+        @RequestParam(required = false) values: List&lt;String&gt;?,
+        @RequestParam(required = false) operations: List&lt;String&gt;?,
+        @RequestParam(required = false) startTime: String?,
+        @RequestParam(required = false) endTime: String?,
+        @RequestParam(required = false) groups: List&lt;String&gt;?,
+
+        ): PaginatedResponse&lt;AlertLogs&gt; {
+<span class="fc" id="L24">        return repository.findAllAlertLogs(page, size, fields, values, operations, startTime, endTime, location, groups)</span>
+    }
+
+    @GetMapping(&quot;/locationCounts&quot;)
+    fun getLocationCounts(
+        @RequestParam(required = false) startTime: String?,
+        @RequestParam(required = false) endTime: String?
+    ): Map&lt;String, Int&gt; {
+<span class="fc" id="L32">        return repository.aggregateEventsByLocation(startTime, endTime)</span>
+    }
+
+    @GetMapping(&quot;/AgentsCounts&quot;)
+    fun getAgentsCounts(
+        @RequestParam(required = false) startTime: String?,
+        @RequestParam(required = false) endTime: String?
+    ): Map&lt;String, Int&gt; {
+<span class="fc" id="L40">        return repository.aggregateEventsByAgent(startTime, endTime)</span>
+    }
+
+    @GetMapping(&quot;/ActionsCounts&quot;)
+    fun getActionsCounts(
+        @RequestParam(required = false) startTime: String?,
+        @RequestParam(required = false) endTime: String?
+    ): Map&lt;String, Int&gt; {
+<span class="fc" id="L48">        return repository.aggregateEventsByAction(startTime, endTime)</span>
+    }
+
+    @GetMapping(&quot;/countHighLevelAlerts&quot;)
+    fun countHighLevelAlerts(
+        @RequestParam(required = false) startTime: String?,
+        @RequestParam(required = false) endTime: String?
+    ): Int {
+<span class="fc" id="L56">        return repository.countHighLevelAlerts(startTime, endTime)</span>
+    }
+
+    @GetMapping(&quot;/countEventsByLocation&quot;)
+    fun countEventsByLocation(
+        @RequestParam(required = false) startTime: String?,
+        @RequestParam(required = false) endTime: String?
+    ): Map&lt;String, Int&gt; {
+<span class="nc" id="L64">        return repository.countEventsByLocation(startTime, endTime)</span>
+    }
+
+    @GetMapping(&quot;/countDistinctLocations&quot;)
+    fun countDistinctLocations(
+        @RequestParam(required = false) startTime: String?,
+        @RequestParam(required = false) endTime: String?
+    ): Int {
+<span class="fc" id="L72">        return repository.countDistinctLocations(startTime, endTime)</span>
+    }
+
+    @GetMapping(&quot;/alerts&quot;)
+    fun countAlerts(
+        @RequestParam(required = false) startTime: String?,
+        @RequestParam(required = false) endTime: String?
+    ): Int {
+<span class="nc" id="L80">        return repository.countAlerts(startTime, endTime)</span>
+    }
+
+    @GetMapping(&quot;/clusters&quot;)
+    fun countCluster(
+        @RequestParam(required = false) startTime: String?,
+        @RequestParam(required = false) endTime: String?
+    ): Map&lt;String, Int&gt; {
+<span class="fc" id="L88">        return repository.countEventsByClusters(startTime, endTime)</span>
+    }
+
+    @GetMapping(&quot;/vulnerability&quot;)
+    fun countVulnerability(
+        @RequestParam(required = false) startTime: String?,
+        @RequestParam(required = false) endTime: String?
+    ): Map&lt;String, Int&gt; {
+<span class="fc" id="L96">        return repository.countEventsByVulnerability(startTime, endTime)</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>DecoderRuleController.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">agent-data-api</a> &gt; <a href="index.source.html" class="el_package">com.xdraiv.agentdata.decoder</a> &gt; <span class="el_source">DecoderRuleController.kt</span></div><h1>DecoderRuleController.kt</h1><pre class="source lang-java linenums">package com.xdraiv.agentdata.decoder
+
+import com.xdraiv.agentdata.decoder.model.DecoderRuleDTO
+import com.xdraiv.agentdata.decoder.model.DecoderRule
+import com.xdraiv.agentdata.decoder.DecoderRepository
+import com.xdraiv.agentdata.decoder.model.CreateDecoderRuleDTO
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.*
+
+@RestController
+@RequestMapping(&quot;/client/{client_id}/agent/{agent_id}/decoder&quot;)
+<span class="pc" id="L13">class DecoderController(val decoderService: DecoderService) {</span>
+
+    @PostMapping(&quot;/{rule_name}&quot;)
+    fun upsertDecoderRule(
+        @PathVariable(&quot;client_id&quot;) clientId: String,
+        @PathVariable(&quot;agent_id&quot;) agentId: String,
+        @PathVariable(&quot;rule_name&quot;) ruleName: String,
+        @RequestBody createDecoderRuleDTO: CreateDecoderRuleDTO
+    ): ResponseEntity&lt;DecoderRuleDTO&gt; {
+<span class="nc" id="L22">        val savedEntity = decoderService.upsertDecoderRule(</span>
+<span class="nc" id="L23">            clientId, agentId, ruleName, DecoderRuleDTO(</span>
+<span class="nc" id="L24">                clientId = clientId,</span>
+<span class="nc" id="L25">                agentId = agentId,</span>
+<span class="nc" id="L26">                ruleName = ruleName,</span>
+<span class="nc" id="L27">                ruleLevel = createDecoderRuleDTO.ruleLevel,</span>
+<span class="nc" id="L28">                rulePattern = createDecoderRuleDTO.rulePattern</span>
+            )
+        )
+<span class="nc" id="L31">        return ResponseEntity(decoderService.mapToDTO(savedEntity), HttpStatus.CREATED)</span>
+    }
+
+    @GetMapping
+    fun getAllDecoderRules(
+        @PathVariable(&quot;client_id&quot;) clientId: String,
+        @PathVariable(&quot;agent_id&quot;) agentId: String
+    ): ResponseEntity&lt;List&lt;DecoderRuleDTO&gt;&gt; {
+<span class="nc" id="L39">        val rules = decoderService.getAllDecoderRules(clientId, agentId)</span>
+
+        // Check if the list is empty, return 204 No Content if true
+<span class="nc bnc" id="L42" title="All 2 branches missed.">        return if (rules.isEmpty()) {</span>
+<span class="nc" id="L43">            ResponseEntity(HttpStatus.NO_CONTENT)</span>
+        } else {
+<span class="nc" id="L45">            ResponseEntity(rules.map { decoderService.mapToDTO(it) }, HttpStatus.OK)</span>
+        }
+    }
+
+    @GetMapping(&quot;/{rule_name}&quot;)
+    fun getDecoderRuleByName(
+        @PathVariable(&quot;client_id&quot;) clientId: String,
+        @PathVariable(&quot;agent_id&quot;) agentId: String,
+        @PathVariable(&quot;rule_name&quot;) ruleName: String
+    ): ResponseEntity&lt;DecoderRuleDTO&gt; {
+<span class="nc" id="L55">        val rule = decoderService.getDecoderRuleByName(clientId, agentId, ruleName)</span>
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        return if (rule != null) {</span>
+<span class="nc" id="L57">            ResponseEntity(decoderService.mapToDTO(rule), HttpStatus.OK)</span>
+        } else {
+<span class="nc" id="L59">            ResponseEntity(HttpStatus.NOT_FOUND)</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ClientController.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">agent-data-api</a> &gt; <a href="index.source.html" class="el_package">com.xdraiv.agentdata.client</a> &gt; <span class="el_source">ClientController.kt</span></div><h1>ClientController.kt</h1><pre class="source lang-java linenums">package com.xdraiv.agentdata.client
+
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.*
+
+@RestController
+@RequestMapping(&quot;/client&quot;)
+<span class="fc" id="L10">class ClientController(</span>
+<span class="fc" id="L11">    val clientSettingsRepository: ClientRepository,</span>
+<span class="pc" id="L12">    val authorizationService: AuthorizationService</span>
+) {
+
+    // Fetch client settings by client_id
+    @GetMapping(&quot;/{client_id}/settings&quot;)
+    fun getClientSettings(@PathVariable(&quot;client_id&quot;) clientId: String): ResponseEntity&lt;ClientResponse&gt; {
+<span class="fc bfc" id="L18" title="All 2 branches covered.">        val client = clientSettingsRepository.findByClientId(clientId)</span>
+<span class="fc" id="L19">            ?: return ResponseEntity.status(HttpStatus.NOT_FOUND).build() // Return 404 if client not found</span>
+
+<span class="fc" id="L21">        val resp = ClientResponse(</span>
+<span class="fc" id="L22">            clientId = client?.clientId,</span>
+<span class="fc" id="L23">            oauthJson = jacksonObjectMapper().readValue(client?.credentialsJson, Map::class.java) as Map&lt;String, Any&gt;,</span>
+<span class="fc" id="L24">            refreshToken = jacksonObjectMapper().readValue(client?.refreshToken, Map::class.java) as Map&lt;String, Any&gt;?</span>
+        )
+<span class="fc" id="L26">        return ResponseEntity.ok(resp)</span>
+    }
+
+
+    @PutMapping(&quot;/{client_id}/settings&quot;)
+    fun upsertClientSettings(
+        @PathVariable(&quot;client_id&quot;) clientId: String,
+        @RequestBody oauthJson: Map&lt;String, Any&gt;
+    ): ResponseEntity&lt;Void&gt; {
+        // Create a Client object with the client_id and oauthJson
+<span class="fc" id="L36">        val client = Client(</span>
+<span class="fc" id="L37">            clientId = clientId,</span>
+<span class="fc" id="L38">            credentialsJson = jacksonObjectMapper().writeValueAsString(oauthJson),</span>
+<span class="fc" id="L39">            refreshToken = &quot;&quot;</span>
+        )
+
+<span class="fc bfc" id="L42" title="All 2 branches covered.">        return if (clientSettingsRepository.upsertClientSettings(client)) {</span>
+<span class="fc" id="L43">            ResponseEntity.status(HttpStatus.CREATED).build()</span>
+<span class="fc" id="L44">        } else {</span>
+<span class="fc" id="L45">            ResponseEntity.notFound().build()</span>
+        }
+    }
+
+
+    @PostMapping(&quot;/{client_id}/authorize/gcp-logs/&quot;)
+    suspend fun authorizationCallback2GCPLogs(
+        @PathVariable(&quot;client_id&quot;) clientId: String,
+        @RequestBody requestBody: Map&lt;String, Any&gt;
+    ) {
+<span class="nc" id="L55">        val code = requestBody[&quot;code&quot;]</span>
+<span class="nc" id="L56">        val state = requestBody[&quot;state&quot;]</span>
+        // Verify 'state' to prevent CSRF
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        if (code != null) {</span>
+            // Exchange code for tokens
+<span class="nc" id="L60">            authorizationService.fetchClientToken(clientId)</span>
+//            call.respondText(&quot;Authorization successful. You can close this window.&quot;)
+        } else {
+<span class="nc" id="L63">            ResponseEntity.badRequest().build&lt;Void&gt;()</span>
+        }
+<span class="nc" id="L65">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

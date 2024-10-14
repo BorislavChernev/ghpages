@@ -1,0 +1,210 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ActivityRepository.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">agent-data-api</a> &gt; <a href="index.source.html" class="el_package">com.xdraiv.agentdata.activity</a> &gt; <span class="el_source">ActivityRepository.kt</span></div><h1>ActivityRepository.kt</h1><pre class="source lang-java linenums">package com.xdraiv.agentdata.activity
+
+import com.jillesvangurp.jsondsl.JsonDsl
+import com.jillesvangurp.ktsearch.*
+import com.jillesvangurp.searchdsls.querydsl.*
+import com.xdraiv.agentdata.config.AppConfig
+import io.ktor.client.*
+import io.ktor.client.engine.cio.*
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.*
+import org.springframework.stereotype.Repository
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
+import java.time.temporal.WeekFields
+import java.util.*
+import kotlin.reflect.KProperty
+
+<span class="nc" id="L21">class XdraivDateHistogramAggConfig : JsonDsl() {</span>
+<span class="nc" id="L22">    var field by property&lt;String&gt;()</span>
+<span class="nc" id="L23">    var interval by property&lt;String&gt;(&quot;interval&quot;)</span>
+}
+
+<span class="nc" id="L26">class XdraivDateHistogramAgg(field: String, block: (XdraivDateHistogramAggConfig.() -&gt; Unit)? = null) :</span>
+<span class="nc" id="L27">    AggQuery(&quot;date_histogram&quot;) {</span>
+
+<span class="nc" id="L29">    constructor(field: KProperty&lt;*&gt;, block: (XdraivDateHistogramAggConfig.() -&gt; Unit)? = null) : this(field.name, block)</span>
+
+<span class="nc" id="L31">    init {</span>
+<span class="nc" id="L32">        val config = XdraivDateHistogramAggConfig()</span>
+<span class="nc" id="L33">        config.field = field</span>
+<span class="nc bnc" id="L34" title="All 2 branches missed.">        block?.invoke(config)</span>
+<span class="nc" id="L35">        put(name, config)</span>
+<span class="nc" id="L36">    }</span>
+}
+
+
+@Repository
+<span class="fc" id="L41">class ActivityRepository(private val config: AppConfig) {</span>
+
+<span class="fc" id="L43">    private val httpClient = HttpClient(CIO) {</span>
+<span class="fc" id="L44">    }</span>
+
+<span class="fc" id="L46">    private val client = SearchClient(</span>
+<span class="fc" id="L47">        KtorRestClient(</span>
+<span class="fc" id="L48">            https = false,</span>
+<span class="fc" id="L49">            nodes = arrayOf(</span>
+<span class="fc" id="L50">                Node(</span>
+<span class="fc" id="L51">                    config.agentData.host,</span>
+<span class="fc" id="L52">                    config.agentData.port</span>
+
+                )
+            ),
+<span class="fc" id="L56">            client = httpClient</span>
+        )
+    )
+
+    fun getCurrentYearAndWeek(): String {
+<span class="nc" id="L61">        val now = LocalDate.now()</span>
+<span class="nc" id="L62">        val weekFields = WeekFields.of(Locale.getDefault())</span>
+<span class="nc" id="L63">        val weekNumber = now.get(weekFields.weekOfWeekBasedYear())</span>
+<span class="nc" id="L64">        val year = now.year</span>
+<span class="nc" id="L65">        return &quot;$year*&quot;</span>
+    }
+
+<span class="nc" id="L68">    fun findByEventId(id: String): List&lt;ActivityLogs&gt; = runBlocking {</span>
+<span class="nc" id="L69">        val index = &quot;${config.agentData.alertIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc" id="L71">        val response = client.search(index) {</span>
+<span class="nc" id="L72">            query = bool {</span>
+<span class="nc" id="L73">                must(</span>
+<span class="nc" id="L74">                    term(&quot;id&quot;, id)</span>
+                )
+<span class="nc" id="L76">            }</span>
+<span class="nc" id="L77">        }</span>
+
+<span class="nc" id="L79">        response.hits!!.hits.map { Json.decodeFromString&lt;ActivityLogs&gt;(it.source.toString()) }</span>
+<span class="nc" id="L80">    }</span>
+
+<span class="nc" id="L82">    fun findAllEvents(): List&lt;ActivityLogs&gt; = runBlocking {</span>
+<span class="nc" id="L83">        val index = &quot;${config.agentData.alertIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc" id="L85">        val response = client.search(index) {</span>
+<span class="nc" id="L86">            query = matchAll()</span>
+<span class="nc" id="L87">        }</span>
+
+<span class="nc" id="L89">        response.hits!!.hits.map { Json.decodeFromString&lt;ActivityLogs&gt;(it.source.toString()) }</span>
+<span class="nc" id="L90">    }</span>
+
+<span class="nc" id="L92">    fun findAggregatedEvents(): List&lt;Pair&lt;String, Int&gt;&gt; = runBlocking {</span>
+<span class="nc" id="L93">        val index = &quot;${config.agentData.alertIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc" id="L95">        val response = client.search(index) {</span>
+<span class="nc" id="L96">            resultSize = 0</span>
+<span class="nc" id="L97">            query = bool {</span>
+<span class="nc" id="L98">                filter(</span>
+<span class="nc" id="L99">                    range(&quot;timestamp&quot;) {</span>
+<span class="nc" id="L100">                        gte = &quot;now-24h&quot;</span>
+<span class="nc" id="L101">                    }</span>
+                )
+<span class="nc" id="L103">            }</span>
+<span class="nc" id="L104">            agg(&quot;items_per_5m&quot;, XdraivDateHistogramAgg(&quot;timestamp&quot;) {</span>
+<span class="nc" id="L105">                interval = &quot;30m&quot;</span>
+<span class="nc" id="L106">            })</span>
+<span class="nc" id="L107">        }</span>
+
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        val itemsPer5m = response.aggregations?.getAggResult&lt;JsonObject&gt;(&quot;items_per_5m&quot;)</span>
+<span class="nc bnc" id="L110" title="All 4 branches missed.">        val buckets = itemsPer5m?.get(&quot;buckets&quot;) as? JsonArray</span>
+
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        buckets?.map { bucket -&gt;</span>
+<span class="nc bnc" id="L113" title="All 6 branches missed.">            val keyAsString = bucket.jsonObject[&quot;key_as_string&quot;]?.jsonPrimitive?.content ?: &quot;&quot;</span>
+<span class="nc bnc" id="L114" title="All 4 branches missed.">            val docCount = bucket.jsonObject[&quot;doc_count&quot;]?.jsonPrimitive?.int ?: 0</span>
+<span class="nc" id="L115">            Pair(keyAsString, docCount)</span>
+<span class="nc" id="L116">        } ?: emptyList()</span>
+<span class="nc" id="L117">    }</span>
+
+<span class="nc" id="L119">    fun findAggregatedEventsDynamic(</span>
+<span class="nc" id="L120">        startTime: String? = null,</span>
+<span class="nc" id="L121">        endTime: String? = null</span>
+<span class="nc" id="L122">    ): List&lt;Pair&lt;String, Int&gt;&gt; = runBlocking {</span>
+<span class="nc" id="L123">        val index = &quot;${config.agentData.alertIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc" id="L125">        val formatter = DateTimeFormatter.ofPattern(&quot;yyyy-MM-dd'T'HH:mm:ss&quot;).withZone(ZoneId.of(&quot;UTC&quot;))</span>
+
+        // If startTime or endTime is null, set default values to the last 24 hours
+<span class="nc" id="L128">        val now = Instant.now()</span>
+<span class="nc" id="L129">        val defaultStartTime = formatter.format(now.minus(24, ChronoUnit.HOURS))</span>
+<span class="nc" id="L130">        val defaultEndTime = formatter.format(now)</span>
+
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        val start = Instant.from(formatter.parse(startTime ?: defaultStartTime))</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        val end = Instant.from(formatter.parse(endTime ?: defaultEndTime))</span>
+<span class="nc" id="L134">        val durationMillis = ChronoUnit.MILLIS.between(start, end)</span>
+
+        // Define a target number of buckets
+<span class="nc" id="L137">        val targetBuckets = 100</span>
+
+        // Calculate the interval dynamically
+<span class="nc" id="L140">        val intervalMillis = durationMillis / targetBuckets</span>
+<span class="nc" id="L141">        val interval = when {</span>
+<span class="nc bnc" id="L142" title="All 2 branches missed.">            intervalMillis &lt; ChronoUnit.MINUTES.duration.toMillis() -&gt; &quot;1s&quot;</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">            intervalMillis &lt; ChronoUnit.HOURS.duration.toMillis() -&gt; &quot;${intervalMillis / ChronoUnit.MINUTES.duration.toMillis()}m&quot;</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">            intervalMillis &lt; ChronoUnit.DAYS.duration.toMillis() -&gt; &quot;${intervalMillis / ChronoUnit.HOURS.duration.toMillis()}h&quot;</span>
+<span class="nc" id="L145">            else -&gt; &quot;${intervalMillis / ChronoUnit.DAYS.duration.toMillis()}d&quot;</span>
+        }
+
+<span class="nc" id="L148">        val response = client.search(index) {</span>
+<span class="nc" id="L149">            resultSize = 0</span>
+<span class="nc" id="L150">            query = bool {</span>
+<span class="nc" id="L151">                filter(</span>
+<span class="nc" id="L152">                    range(&quot;timestamp&quot;) {</span>
+<span class="nc" id="L153">                        gte = formatter.format(start)</span>
+<span class="nc" id="L154">                        lte = formatter.format(end)</span>
+<span class="nc" id="L155">                        format = &quot;yyyy-MM-dd'T'HH:mm:ss&quot;</span>
+<span class="nc" id="L156">                    }</span>
+                )
+<span class="nc" id="L158">            }</span>
+<span class="nc" id="L159">            agg(&quot;items_per_interval&quot;, XdraivDateHistogramAgg(&quot;timestamp&quot;) {</span>
+<span class="nc" id="L160">                this.interval = interval</span>
+<span class="nc" id="L161">            })</span>
+<span class="nc" id="L162">        }</span>
+
+<span class="nc bnc" id="L164" title="All 2 branches missed.">        val itemsPerInterval = response.aggregations?.getAggResult&lt;JsonObject&gt;(&quot;items_per_interval&quot;)</span>
+<span class="nc bnc" id="L165" title="All 4 branches missed.">        val buckets = itemsPerInterval?.get(&quot;buckets&quot;) as? JsonArray</span>
+
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        buckets?.map { bucket -&gt;</span>
+<span class="nc bnc" id="L168" title="All 6 branches missed.">            val keyAsString = bucket.jsonObject[&quot;key_as_string&quot;]?.jsonPrimitive?.content ?: &quot;&quot;</span>
+<span class="nc bnc" id="L169" title="All 4 branches missed.">            val docCount = bucket.jsonObject[&quot;doc_count&quot;]?.jsonPrimitive?.int ?: 0</span>
+<span class="nc" id="L170">            Pair(keyAsString, docCount)</span>
+<span class="nc" id="L171">        } ?: emptyList()</span>
+<span class="nc" id="L172">    }</span>
+
+<span class="nc" id="L174">    fun findAggregatedEventsCount(</span>
+<span class="nc" id="L175">        startTime: String? = null,</span>
+<span class="nc" id="L176">        endTime: String? = null</span>
+<span class="nc" id="L177">    ): Int = runBlocking {</span>
+<span class="nc" id="L178">        val index = &quot;${config.agentData.alertIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc" id="L180">        val formatter = DateTimeFormatter.ofPattern(&quot;yyyy-MM-dd'T'HH:mm:ss&quot;).withZone(ZoneId.of(&quot;UTC+3&quot;))</span>
+
+        // If startTime or endTime is null, set default values to the last 24 hours
+<span class="nc" id="L183">        val now = Instant.now()</span>
+<span class="nc" id="L184">        val defaultStartTime = formatter.format(now.minus(24, ChronoUnit.HOURS))</span>
+<span class="nc" id="L185">        val defaultEndTime = formatter.format(now)</span>
+
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        val start = Instant.from(formatter.parse(startTime ?: defaultStartTime))</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        val end = Instant.from(formatter.parse(endTime ?: defaultEndTime))</span>
+
+<span class="nc" id="L190">        val response = client.search(index) {</span>
+<span class="nc" id="L191">            resultSize = 0</span>
+<span class="nc" id="L192">            query = bool {</span>
+<span class="nc" id="L193">                filter(</span>
+<span class="nc" id="L194">                    range(&quot;@timestamp&quot;) {</span>
+<span class="nc" id="L195">                        gte = formatter.format(start)</span>
+<span class="nc" id="L196">                        lte = formatter.format(end)</span>
+<span class="nc" id="L197">                        format = &quot;yyyy-MM-dd'T'HH:mm:ss&quot;</span>
+<span class="nc" id="L198">                    }</span>
+                )
+<span class="nc" id="L200">            }</span>
+<span class="nc" id="L201">            agg(&quot;total_count&quot;, TermsAgg(&quot;_index&quot;))</span>
+<span class="nc" id="L202">        }</span>
+
+<span class="nc bnc" id="L204" title="All 2 branches missed.">        val totalCountAgg = response.aggregations?.termsResult(&quot;total_count&quot;)</span>
+<span class="nc bnc" id="L205" title="All 10 branches missed.">        val totalCount = totalCountAgg?.buckets?.sumOf { it.jsonObject[&quot;doc_count&quot;]?.jsonPrimitive?.int ?: 0 } ?: 0</span>
+
+<span class="nc" id="L207">        totalCount</span>
+<span class="nc" id="L208">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

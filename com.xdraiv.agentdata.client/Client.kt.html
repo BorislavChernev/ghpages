@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>Client.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">agent-data-api</a> &gt; <a href="index.source.html" class="el_package">com.xdraiv.agentdata.client</a> &gt; <span class="el_source">Client.kt</span></div><h1>Client.kt</h1><pre class="source lang-java linenums">package com.xdraiv.agentdata.client
+
+import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import jakarta.persistence.Column
+import jakarta.persistence.Entity
+import jakarta.persistence.Id
+import jakarta.persistence.Table
+
+@Entity
+@Table(name = &quot;clients&quot;, schema = &quot;public&quot;)
+<span class="fc" id="L11">data class Client(</span>
+<span class="fc" id="L12">    @Id</span>
+    @Column(name = &quot;client_id&quot;)
+    val clientId: String,
+
+<span class="pc" id="L16">    @Column(name = &quot;credentials_json&quot;)</span>
+<span class="nc" id="L17">    var credentialsJson: String,</span>
+
+<span class="pc" id="L19">    @Column(name = &quot;refresh_token&quot;)</span>
+<span class="nc" id="L20">    var refreshToken: String,</span>
+) {
+<span class="nc" id="L22">    constructor() : this(&quot;&quot;, &quot;&quot;, &quot;&quot;)</span>
+
+    fun getOauthJson(): Map&lt;String, Any&gt; {
+<span class="nc" id="L25">        val mapper = jacksonObjectMapper()</span>
+<span class="nc" id="L26">        return mapper.readValue(credentialsJson, Map::class.java) as Map&lt;String, Any&gt;</span>
+    }
+
+    fun setOauthJson(oauthJson: Map&lt;String, Any&gt;) {
+<span class="nc" id="L30">        val mapper = jacksonObjectMapper()</span>
+<span class="nc" id="L31">        this.credentialsJson = mapper.writeValueAsString(oauthJson)</span>
+<span class="nc" id="L32">    }</span>
+
+    fun getRefreshToken(): Map&lt;String, Any&gt; {
+<span class="nc" id="L35">        val mapper = jacksonObjectMapper()</span>
+<span class="nc" id="L36">        return mapper.readValue(refreshToken, Map::class.java) as Map&lt;String, Any&gt;</span>
+    }
+
+    fun setRefreshToken(refreshToken: Map&lt;String, Any&gt;) {
+<span class="nc" id="L40">        val mapper = jacksonObjectMapper()</span>
+<span class="nc" id="L41">        this.refreshToken = mapper.writeValueAsString(refreshToken)</span>
+<span class="nc" id="L42">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,559 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AlertLogsRepository.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">agent-data-api</a> &gt; <a href="index.source.html" class="el_package">com.xdraiv.agentdata.alertLogs</a> &gt; <span class="el_source">AlertLogsRepository.kt</span></div><h1>AlertLogsRepository.kt</h1><pre class="source lang-java linenums">package com.xdraiv.agentdata.alertLogs
+
+import com.jillesvangurp.ktsearch.*
+import com.jillesvangurp.searchdsls.querydsl.*
+import com.xdraiv.agentdata.config.AppConfig
+import io.ktor.client.*
+import io.ktor.client.engine.cio.*
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import org.springframework.stereotype.Repository
+import java.time.LocalDate
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
+import java.time.temporal.ChronoUnit
+import java.time.temporal.WeekFields
+import java.util.*
+
+
+@Repository
+<span class="fc" id="L26">class AlertLogsRepository(private val config: AppConfig) {</span>
+
+<span class="fc" id="L28">    private val httpClient = HttpClient(CIO) {</span>
+<span class="fc" id="L29">    }</span>
+
+<span class="fc" id="L31">    private val client = SearchClient(</span>
+<span class="fc" id="L32">        KtorRestClient(</span>
+<span class="fc" id="L33">            https = false,</span>
+<span class="fc" id="L34">            nodes = arrayOf(</span>
+<span class="fc" id="L35">                Node(</span>
+<span class="fc" id="L36">                    config.agentData.host,</span>
+<span class="fc" id="L37">                    config.agentData.port</span>
+                )
+            ),
+<span class="fc" id="L40">            client = httpClient</span>
+        )
+    )
+
+
+<span class="fc" id="L45">    private val json = Json {</span>
+<span class="fc" id="L46">        ignoreUnknownKeys = true</span>
+<span class="fc" id="L47">    }</span>
+
+    fun parseDate(dateString: String): ZonedDateTime? {
+<span class="nc" id="L50">        val formats = listOf(</span>
+<span class="nc" id="L51">            DateTimeFormatter.ofPattern(&quot;yyyy-MM-dd'T'HH:mm:ss.SSSXXX&quot;),</span>
+<span class="nc" id="L52">            DateTimeFormatter.ofPattern(&quot;yyyy-MM-dd'T'HH:mm:ss.SSSZ&quot;)</span>
+        )
+<span class="nc" id="L54">        return formats.asSequence().mapNotNull { format -&gt;</span>
+<span class="nc" id="L55">            try {</span>
+<span class="nc" id="L56">                ZonedDateTime.parse(dateString, format)</span>
+<span class="nc" id="L57">            } catch (e: DateTimeParseException) {</span>
+<span class="nc" id="L58">                null</span>
+<span class="nc" id="L59">            }</span>
+<span class="nc" id="L60">        }.firstOrNull()</span>
+    }
+
+    fun toIso8601Format(dateTime: String): String {
+<span class="nc bnc" id="L64" title="All 6 branches missed.">        return parseDate(dateTime)?.toInstant()?.toString() ?: dateTime</span>
+    }
+
+    fun getCurrentYearAndWeek(): String {
+<span class="nc" id="L68">        val now = LocalDate.now()</span>
+<span class="nc" id="L69">        val weekFields = WeekFields.of(Locale.getDefault())</span>
+<span class="nc" id="L70">        val weekNumber = now.get(weekFields.weekOfWeekBasedYear())</span>
+<span class="nc" id="L71">        val year = now.year</span>
+<span class="nc" id="L72">        return &quot;$year*&quot;</span>
+    }
+
+<span class="nc" id="L75">    fun findAllAlertLogs(</span>
+        page: Int,
+        size: Int,
+        fields: List&lt;String&gt;?,
+        values: List&lt;String&gt;?,
+<span class="nc" id="L80">        operations: List&lt;String&gt;? = listOf(&quot;equals&quot;),</span>
+<span class="nc" id="L81">        startTime: String? = null,</span>
+<span class="nc" id="L82">        endTime: String? = null,</span>
+        location: String?,
+        groups: List&lt;String&gt;?
+<span class="nc" id="L85">    ): PaginatedResponse&lt;AlertLogs&gt; = runBlocking {</span>
+<span class="nc" id="L86">        val index = &quot;${config.agentData.alertIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+        // Perform the search query and get the total number of matching documents
+<span class="nc" id="L89">        val response = client.search(index) {</span>
+<span class="nc" id="L90">            resultSize = size</span>
+<span class="nc" id="L91">            from = (page - 1) * size</span>
+<span class="nc" id="L92">            query = bool {</span>
+<span class="nc" id="L93">                must(matchAll())</span>
+
+<span class="nc bnc" id="L95" title="All 2 branches missed.">                fields?.forEachIndexed { index, field -&gt;</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">                    val value = values?.get(index)</span>
+<span class="nc bnc" id="L97" title="All 4 branches missed.">                    val operation = operations?.getOrNull(index) ?: &quot;equals&quot;</span>
+<span class="nc bnc" id="L98" title="All 4 branches missed.">                    when (operation) {</span>
+<span class="nc" id="L99">                        &quot;equals&quot; -&gt; must(term(field, value!!))</span>
+<span class="nc" id="L100">                        &quot;gte&quot; -&gt; must(range(field) { gte = value!! })</span>
+<span class="nc" id="L101">                        &quot;lte&quot; -&gt; must(range(field) { lte = value!! })</span>
+<span class="nc" id="L102">                        else -&gt; must(term(field, value!!))</span>
+                    }
+<span class="nc" id="L104">                }</span>
+
+<span class="nc bnc" id="L106" title="All 4 branches missed.">                if (startTime != null &amp;&amp; endTime != null) {</span>
+<span class="nc" id="L107">                    must(range(&quot;timestamp&quot;) {</span>
+<span class="nc" id="L108">                        gte = toIso8601Format(startTime)</span>
+<span class="nc" id="L109">                        lte = toIso8601Format(endTime)</span>
+<span class="nc" id="L110">                    })</span>
+                }
+<span class="nc" id="L112">            }</span>
+<span class="nc" id="L113">            sort {</span>
+<span class="nc" id="L114">                add(&quot;timestamp&quot;, SortOrder.DESC)</span>
+<span class="nc" id="L115">            }</span>
+<span class="nc" id="L116">            filterSource(</span>
+<span class="nc" id="L117">                &quot;cluster&quot;,</span>
+<span class="nc" id="L118">                &quot;agent&quot;,</span>
+<span class="nc" id="L119">                &quot;manager&quot;,</span>
+<span class="nc" id="L120">                &quot;data&quot;,</span>
+<span class="nc" id="L121">                &quot;timestamp&quot;,</span>
+<span class="nc" id="L122">                &quot;rule.description&quot;,</span>
+<span class="nc" id="L123">                &quot;rule.level&quot;,</span>
+<span class="nc" id="L124">                &quot;location&quot;,</span>
+<span class="nc" id="L125">                &quot;rule.groups&quot;</span>
+            )
+<span class="nc" id="L127">        }</span>
+
+        // total items count
+<span class="nc" id="L130">        val totalItems = response.total</span>
+
+        // Calculate total pages
+<span class="nc" id="L133">        val totalPages =</span>
+<span class="nc bnc" id="L134" title="All 4 branches missed.">            if (totalItems == 0L) 1 else (totalItems / size).toInt() + if (totalItems % size == 0L) 0 else 1</span>
+
+        // deserialize hits to AlertLogs
+<span class="nc bnc" id="L137" title="All 4 branches missed.">        val items = response.hits?.hits?.map { json.decodeFromString&lt;AlertLogs&gt;(it.source.toString()) } ?: emptyList()</span>
+
+<span class="nc" id="L139">        PaginatedResponse(</span>
+<span class="nc" id="L140">            items = items,</span>
+<span class="nc" id="L141">            totalItems = totalItems,</span>
+<span class="nc" id="L142">            totalPages = totalPages,</span>
+<span class="nc" id="L143">            currentPage = page</span>
+<span class="nc" id="L144">        )</span>
+<span class="nc" id="L145">    }</span>
+
+    fun aggregateAlertLogs(
+        startTime: String,
+        endTime: String,
+        field: String,
+        page: Int,
+        size: Int
+<span class="nc" id="L153">    ): Map&lt;String, Any?&gt; = runBlocking {</span>
+<span class="nc" id="L154">        val index = &quot;${config.agentData.alertIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc" id="L156">        val isoStartTime = toIso8601Format(startTime)</span>
+<span class="nc" id="L157">        val isoEndTime = toIso8601Format(endTime)</span>
+
+<span class="nc" id="L159">        println(&quot;ISO Start Time: $isoStartTime&quot;)</span>
+<span class="nc" id="L160">        println(&quot;ISO End Time: $isoEndTime&quot;)</span>
+
+<span class="nc" id="L162">        val response = client.search(index) {</span>
+<span class="nc" id="L163">            query = bool {</span>
+<span class="nc" id="L164">                filter(</span>
+<span class="nc" id="L165">                    range(&quot;timestamp&quot;) {</span>
+<span class="nc" id="L166">                        gte = isoStartTime</span>
+<span class="nc" id="L167">                        lte = isoEndTime</span>
+<span class="nc" id="L168">                    }</span>
+                )
+<span class="nc" id="L170">            }</span>
+<span class="nc" id="L171">            resultSize = size</span>
+<span class="nc" id="L172">            from = (page - 1) * size</span>
+<span class="nc" id="L173">            agg(field, TermsAgg(field) {</span>
+<span class="nc" id="L174">                aggSize = size.toLong()</span>
+<span class="nc" id="L175">            })</span>
+<span class="nc" id="L176">        }</span>
+
+<span class="nc bnc" id="L178" title="All 4 branches missed.">        val buckets = response.aggregations?.termsResult(field)?.parsedBuckets</span>
+<span class="nc" id="L179">        println(&quot;BUCKETS HAH: $buckets&quot;)</span>
+
+<span class="nc" id="L181">        mapOf(</span>
+<span class="nc bnc" id="L182" title="All 4 branches missed.">            &quot;total&quot; to response.hits?.total?.value,</span>
+<span class="nc bnc" id="L183" title="All 4 branches missed.">            &quot;hits&quot; to response.hits?.hits?.map { json.decodeFromString&lt;AlertLogs&gt;(it.source.toString()) },</span>
+<span class="nc" id="L184">            &quot;aggregations&quot; to buckets</span>
+<span class="nc" id="L185">        )</span>
+<span class="nc" id="L186">    }</span>
+
+<span class="nc" id="L188">    @Serializable</span>
+<span class="nc" id="L189">    data class TermsBucket(</span>
+<span class="nc" id="L190">        val key: String,</span>
+<span class="nc" id="L191">        @SerialName(&quot;doc_count&quot;)</span>
+        val docCount: Long,
+<span class="nc" id="L193">        @SerialName(&quot;key_as_string&quot;)</span>
+<span class="nc" id="L194">        val keyAsString: String? = null</span>
+<span class="nc" id="L195">    )</span>
+
+<span class="nc" id="L197">    fun aggregateEventsByLocation(</span>
+<span class="nc" id="L198">        startTime: String? = null,</span>
+<span class="nc" id="L199">        endTime: String? = null</span>
+<span class="nc" id="L200">    ): Map&lt;String, Int&gt; = runBlocking {</span>
+<span class="nc" id="L201">        val index = &quot;${config.agentData.alertIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        val endTimeFormatted = endTime ?: ZonedDateTime.now().format(DateTimeFormatter.ISO_INSTANT)</span>
+<span class="nc" id="L204">        val startTimeFormatted =</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">            startTime ?: ZonedDateTime.now().minus(24, ChronoUnit.HOURS).format(DateTimeFormatter.ISO_INSTANT)</span>
+
+<span class="nc" id="L207">        val response = client.search(index) {</span>
+<span class="nc" id="L208">            query = bool {</span>
+<span class="nc" id="L209">                filter(</span>
+<span class="nc" id="L210">                    range(&quot;timestamp&quot;) {</span>
+<span class="nc" id="L211">                        gte = startTimeFormatted</span>
+<span class="nc" id="L212">                        lte = endTimeFormatted</span>
+<span class="nc" id="L213">                    }</span>
+                )
+<span class="nc" id="L215">            }</span>
+<span class="nc" id="L216">            resultSize = 0</span>
+<span class="nc" id="L217">            agg(</span>
+<span class="nc" id="L218">                &quot;location_counts&quot;,</span>
+<span class="nc" id="L219">                TermsAgg(&quot;location&quot;) {</span>
+<span class="nc" id="L220">                    aggSize = 6</span>
+<span class="nc" id="L221">                }</span>
+            )
+<span class="nc" id="L223">        }</span>
+<span class="nc" id="L224">        println(&quot;Response: $response&quot;)</span>
+<span class="nc" id="L225">        println(&quot;Aggregations: ${response.aggregations}&quot;)</span>
+
+<span class="nc bnc" id="L227" title="All 8 branches missed.">        val buckets = response.aggregations?.get(&quot;location_counts&quot;)?.jsonObject?.get(&quot;buckets&quot;)?.jsonArray</span>
+<span class="nc" id="L228">        val result = mutableMapOf&lt;String, Int&gt;()</span>
+
+<span class="nc bnc" id="L230" title="All 6 branches missed.">        if (buckets.isNullOrEmpty()) {</span>
+<span class="nc" id="L231">            println(&quot;No buckets found.&quot;)</span>
+        } else {
+<span class="nc" id="L233">            buckets.forEach { bucket -&gt;</span>
+<span class="nc" id="L234">                val termsBucket = json.decodeFromJsonElement&lt;TermsBucket&gt;(bucket)</span>
+<span class="nc" id="L235">                result[termsBucket.key] = termsBucket.docCount.toInt()</span>
+<span class="nc" id="L236">            }</span>
+        }
+
+<span class="nc" id="L239">        result</span>
+<span class="nc" id="L240">    }</span>
+
+<span class="nc" id="L242">    fun aggregateEventsByAgent(</span>
+<span class="nc" id="L243">        startTime: String? = null,</span>
+<span class="nc" id="L244">        endTime: String? = null</span>
+<span class="nc" id="L245">    ): Map&lt;String, Int&gt; = runBlocking {</span>
+<span class="nc" id="L246">        val index = &quot;${config.agentData.alertIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc bnc" id="L248" title="All 2 branches missed.">        val endTimeFormatted = endTime ?: ZonedDateTime.now().format(DateTimeFormatter.ISO_INSTANT)</span>
+<span class="nc" id="L249">        val startTimeFormatted =</span>
+<span class="nc bnc" id="L250" title="All 2 branches missed.">            startTime ?: ZonedDateTime.now().minus(24, ChronoUnit.HOURS).format(DateTimeFormatter.ISO_INSTANT)</span>
+
+<span class="nc" id="L252">        val response = client.search(index) {</span>
+<span class="nc" id="L253">            query = bool {</span>
+<span class="nc" id="L254">                filter(</span>
+<span class="nc" id="L255">                    range(&quot;timestamp&quot;) {</span>
+<span class="nc" id="L256">                        gte = startTimeFormatted</span>
+<span class="nc" id="L257">                        lte = endTimeFormatted</span>
+<span class="nc" id="L258">                    }</span>
+                )
+<span class="nc" id="L260">            }</span>
+<span class="nc" id="L261">            resultSize = 0</span>
+<span class="nc" id="L262">            agg(</span>
+<span class="nc" id="L263">                &quot;location_counts&quot;,</span>
+<span class="nc" id="L264">                TermsAgg(&quot;agent.name&quot;) {</span>
+<span class="nc" id="L265">                    aggSize = 1000</span>
+<span class="nc" id="L266">                }</span>
+            )
+<span class="nc" id="L268">        }</span>
+
+<span class="nc" id="L270">        println(&quot;Response: $response&quot;)</span>
+<span class="nc" id="L271">        println(&quot;Aggregations: ${response.aggregations}&quot;)</span>
+
+<span class="nc bnc" id="L273" title="All 8 branches missed.">        val buckets = response.aggregations?.get(&quot;location_counts&quot;)?.jsonObject?.get(&quot;buckets&quot;)?.jsonArray</span>
+<span class="nc" id="L274">        val result = mutableMapOf&lt;String, Int&gt;()</span>
+
+<span class="nc bnc" id="L276" title="All 6 branches missed.">        if (buckets.isNullOrEmpty()) {</span>
+<span class="nc" id="L277">            println(&quot;No buckets found.&quot;)</span>
+        } else {
+<span class="nc" id="L279">            buckets.forEach { bucket -&gt;</span>
+<span class="nc" id="L280">                val termsBucket = json.decodeFromJsonElement&lt;TermsBucket&gt;(bucket)</span>
+<span class="nc" id="L281">                result[termsBucket.key] = termsBucket.docCount.toInt()</span>
+<span class="nc" id="L282">            }</span>
+        }
+
+<span class="nc" id="L285">        result</span>
+<span class="nc" id="L286">    }</span>
+
+<span class="nc" id="L288">    fun aggregateEventsByAction(</span>
+<span class="nc" id="L289">        startTime: String? = null,</span>
+<span class="nc" id="L290">        endTime: String? = null</span>
+<span class="nc" id="L291">    ): Map&lt;String, Int&gt; = runBlocking {</span>
+<span class="nc" id="L292">        val index = &quot;${config.agentData.alertIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc bnc" id="L294" title="All 2 branches missed.">        val endTimeFormatted = endTime ?: ZonedDateTime.now().format(DateTimeFormatter.ISO_INSTANT)</span>
+<span class="nc" id="L295">        val startTimeFormatted =</span>
+<span class="nc bnc" id="L296" title="All 2 branches missed.">            startTime ?: ZonedDateTime.now().minus(24, ChronoUnit.HOURS).format(DateTimeFormatter.ISO_INSTANT)</span>
+
+<span class="nc" id="L298">        val response = client.search(index) {</span>
+<span class="nc" id="L299">            query = bool {</span>
+<span class="nc" id="L300">                filter(</span>
+<span class="nc" id="L301">                    range(&quot;timestamp&quot;) {</span>
+<span class="nc" id="L302">                        gte = startTimeFormatted</span>
+<span class="nc" id="L303">                        lte = endTimeFormatted</span>
+<span class="nc" id="L304">                    }</span>
+                )
+<span class="nc" id="L306">            }</span>
+<span class="nc" id="L307">            resultSize = 0</span>
+<span class="nc" id="L308">            agg(</span>
+<span class="nc" id="L309">                &quot;location_counts&quot;,</span>
+<span class="nc" id="L310">                TermsAgg(&quot;rule.description&quot;) {</span>
+<span class="nc" id="L311">                    aggSize = 7</span>
+<span class="nc" id="L312">                }</span>
+            )
+<span class="nc" id="L314">        }</span>
+
+<span class="nc" id="L316">        println(&quot;Response: $response&quot;)</span>
+<span class="nc" id="L317">        println(&quot;Aggregations: ${response.aggregations}&quot;)</span>
+
+<span class="nc bnc" id="L319" title="All 8 branches missed.">        val buckets = response.aggregations?.get(&quot;location_counts&quot;)?.jsonObject?.get(&quot;buckets&quot;)?.jsonArray</span>
+<span class="nc" id="L320">        val result = mutableMapOf&lt;String, Int&gt;()</span>
+
+<span class="nc bnc" id="L322" title="All 6 branches missed.">        if (buckets.isNullOrEmpty()) {</span>
+<span class="nc" id="L323">            println(&quot;No buckets found.&quot;)</span>
+        } else {
+<span class="nc" id="L325">            buckets.forEach { bucket -&gt;</span>
+<span class="nc" id="L326">                val termsBucket = json.decodeFromJsonElement&lt;TermsBucket&gt;(bucket)</span>
+<span class="nc" id="L327">                result[termsBucket.key] = termsBucket.docCount.toInt()</span>
+<span class="nc" id="L328">            }</span>
+        }
+
+<span class="nc" id="L331">        result</span>
+<span class="nc" id="L332">    }</span>
+
+<span class="nc" id="L334">    fun countHighLevelAlerts(</span>
+<span class="nc" id="L335">        startTime: String? = null,</span>
+<span class="nc" id="L336">        endTime: String? = null</span>
+<span class="nc" id="L337">    ): Int = runBlocking {</span>
+<span class="nc" id="L338">        val index = &quot;${config.agentData.alertIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc bnc" id="L340" title="All 2 branches missed.">        val endTimeFormatted = endTime ?: ZonedDateTime.now().format(DateTimeFormatter.ISO_INSTANT)</span>
+<span class="nc" id="L341">        val startTimeFormatted =</span>
+<span class="nc bnc" id="L342" title="All 2 branches missed.">            startTime ?: ZonedDateTime.now().minus(24, ChronoUnit.HOURS).format(DateTimeFormatter.ISO_INSTANT)</span>
+<span class="nc" id="L343">        val response = client.search(index) {</span>
+<span class="nc" id="L344">            query = bool {</span>
+<span class="nc" id="L345">                must(range(&quot;rule.level&quot;) {</span>
+<span class="nc" id="L346">                    gte = &quot;10&quot;</span>
+<span class="nc" id="L347">                })</span>
+<span class="nc" id="L348">                filter(</span>
+<span class="nc" id="L349">                    range(&quot;timestamp&quot;) {</span>
+<span class="nc" id="L350">                        gte = startTimeFormatted</span>
+<span class="nc" id="L351">                        lte = endTimeFormatted</span>
+<span class="nc" id="L352">                    }</span>
+                )
+<span class="nc" id="L354">            }</span>
+<span class="nc" id="L355">            resultSize = 0</span>
+<span class="nc" id="L356">        }</span>
+
+<span class="nc bnc" id="L358" title="All 4 branches missed.">        response.hits?.total?.value?.toInt() ?: 0</span>
+<span class="nc" id="L359">    }</span>
+
+<span class="nc" id="L361">    fun countEventsByLocation(</span>
+<span class="nc" id="L362">        startTime: String? = null,</span>
+<span class="nc" id="L363">        endTime: String? = null</span>
+<span class="nc" id="L364">    ): Map&lt;String, Int&gt; = runBlocking {</span>
+<span class="nc" id="L365">        val index = &quot;${config.agentData.alertIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc bnc" id="L367" title="All 2 branches missed.">        val endTimeFormatted = endTime ?: ZonedDateTime.now().format(DateTimeFormatter.ISO_INSTANT)</span>
+<span class="nc" id="L368">        val startTimeFormatted =</span>
+<span class="nc bnc" id="L369" title="All 2 branches missed.">            startTime ?: ZonedDateTime.now().minus(24, ChronoUnit.HOURS).format(DateTimeFormatter.ISO_INSTANT)</span>
+
+<span class="nc" id="L371">        val response = client.search(index) {</span>
+<span class="nc" id="L372">            query = bool {</span>
+<span class="nc" id="L373">                filter(</span>
+<span class="nc" id="L374">                    range(&quot;timestamp&quot;) {</span>
+<span class="nc" id="L375">                        gte = startTimeFormatted</span>
+<span class="nc" id="L376">                        lte = endTimeFormatted</span>
+<span class="nc" id="L377">                    }</span>
+                )
+<span class="nc" id="L379">            }</span>
+<span class="nc" id="L380">            resultSize = 0</span>
+<span class="nc" id="L381">            agg(</span>
+<span class="nc" id="L382">                &quot;location_counts&quot;,</span>
+<span class="nc" id="L383">                TermsAgg(&quot;location&quot;) {</span>
+<span class="nc" id="L384">                    aggSize = 8</span>
+<span class="nc" id="L385">                }</span>
+            )
+<span class="nc" id="L387">        }</span>
+
+<span class="nc" id="L389">        println(&quot;Response: $response&quot;)</span>
+<span class="nc" id="L390">        println(&quot;Aggregations: ${response.aggregations}&quot;)</span>
+<span class="nc bnc" id="L391" title="All 8 branches missed.">        val buckets = response.aggregations?.get(&quot;location_counts&quot;)?.jsonObject?.get(&quot;buckets&quot;)?.jsonArray</span>
+<span class="nc" id="L392">        val result = mutableMapOf&lt;String, Int&gt;()</span>
+
+<span class="nc bnc" id="L394" title="All 6 branches missed.">        if (buckets.isNullOrEmpty()) {</span>
+<span class="nc" id="L395">            println(&quot;No buckets found.&quot;)</span>
+        } else {
+<span class="nc" id="L397">            buckets.forEach { bucket -&gt;</span>
+<span class="nc" id="L398">                val termsBucket = json.decodeFromJsonElement&lt;TermsBucket&gt;(bucket)</span>
+<span class="nc" id="L399">                result[termsBucket.key] = termsBucket.docCount.toInt()</span>
+<span class="nc" id="L400">            }</span>
+        }
+
+<span class="nc" id="L403">        result</span>
+<span class="nc" id="L404">    }</span>
+
+<span class="nc" id="L406">    fun countDistinctLocations(</span>
+<span class="nc" id="L407">        startTime: String? = null,</span>
+<span class="nc" id="L408">        endTime: String? = null</span>
+<span class="nc" id="L409">    ): Int = runBlocking {</span>
+<span class="nc" id="L410">        val index = &quot;${config.agentData.alertIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc bnc" id="L412" title="All 2 branches missed.">        val endTimeFormatted = endTime ?: ZonedDateTime.now().format(DateTimeFormatter.ISO_INSTANT)</span>
+<span class="nc" id="L413">        val startTimeFormatted =</span>
+<span class="nc bnc" id="L414" title="All 2 branches missed.">            startTime ?: ZonedDateTime.now().minus(24, ChronoUnit.HOURS).format(DateTimeFormatter.ISO_INSTANT)</span>
+
+<span class="nc" id="L416">        val response = client.search(index) {</span>
+<span class="nc" id="L417">            query = bool {</span>
+<span class="nc" id="L418">                filter(</span>
+<span class="nc" id="L419">                    range(&quot;timestamp&quot;) {</span>
+<span class="nc" id="L420">                        gte = startTimeFormatted</span>
+<span class="nc" id="L421">                        lte = endTimeFormatted</span>
+<span class="nc" id="L422">                    }</span>
+                )
+<span class="nc" id="L424">            }</span>
+<span class="nc" id="L425">            resultSize = 0</span>
+<span class="nc" id="L426">            agg(</span>
+<span class="nc" id="L427">                &quot;location_counts&quot;,</span>
+<span class="nc" id="L428">                TermsAgg(&quot;location&quot;) {</span>
+<span class="nc" id="L429">                    aggSize = 1000</span>
+<span class="nc" id="L430">                }</span>
+            )
+<span class="nc" id="L432">        }</span>
+<span class="nc" id="L433">        println(&quot;Response: $response&quot;)</span>
+<span class="nc" id="L434">        println(&quot;Aggregations: ${response.aggregations}&quot;)</span>
+
+<span class="nc bnc" id="L436" title="All 8 branches missed.">        val buckets = response.aggregations?.get(&quot;location_counts&quot;)?.jsonObject?.get(&quot;buckets&quot;)?.jsonArray</span>
+
+<span class="nc bnc" id="L438" title="All 2 branches missed.">        buckets?.size ?: 0</span>
+<span class="nc" id="L439">    }</span>
+
+<span class="nc" id="L441">    fun countAlerts(</span>
+<span class="nc" id="L442">        startTime: String? = null,</span>
+<span class="nc" id="L443">        endTime: String? = null</span>
+<span class="nc" id="L444">    ): Int = runBlocking {</span>
+<span class="nc" id="L445">        val index = &quot;${config.agentData.alertIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc bnc" id="L447" title="All 2 branches missed.">        val endTimeFormatted = endTime ?: ZonedDateTime.now().format(DateTimeFormatter.ISO_INSTANT)</span>
+<span class="nc" id="L448">        val startTimeFormatted =</span>
+<span class="nc bnc" id="L449" title="All 2 branches missed.">            startTime ?: ZonedDateTime.now().minus(24, ChronoUnit.HOURS).format(DateTimeFormatter.ISO_INSTANT)</span>
+
+<span class="nc" id="L451">        val response = client.search(index) {</span>
+<span class="nc" id="L452">            query = bool {</span>
+<span class="nc" id="L453">                must(range(&quot;rule.level&quot;) {</span>
+<span class="nc" id="L454">                    gte = &quot;12&quot;</span>
+<span class="nc" id="L455">                })</span>
+<span class="nc" id="L456">                filter(</span>
+<span class="nc" id="L457">                    range(&quot;timestamp&quot;) {</span>
+<span class="nc" id="L458">                        gte = startTimeFormatted</span>
+<span class="nc" id="L459">                        lte = endTimeFormatted</span>
+<span class="nc" id="L460">                    }</span>
+                )
+<span class="nc" id="L462">            }</span>
+<span class="nc" id="L463">            resultSize = 0</span>
+<span class="nc" id="L464">        }</span>
+<span class="nc bnc" id="L465" title="All 4 branches missed.">        response.hits?.total?.value?.toInt() ?: 0</span>
+<span class="nc" id="L466">    }</span>
+
+<span class="nc" id="L468">    fun countEventsByClusters(</span>
+<span class="nc" id="L469">        startTime: String? = null,</span>
+<span class="nc" id="L470">        endTime: String? = null</span>
+<span class="nc" id="L471">    ): Map&lt;String, Int&gt; = runBlocking {</span>
+<span class="nc" id="L472">        val index = &quot;${config.agentData.alertIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc bnc" id="L474" title="All 2 branches missed.">        val endTimeFormatted = endTime ?: ZonedDateTime.now().format(DateTimeFormatter.ISO_INSTANT)</span>
+<span class="nc" id="L475">        val startTimeFormatted =</span>
+<span class="nc bnc" id="L476" title="All 2 branches missed.">            startTime ?: ZonedDateTime.now().minus(24, ChronoUnit.HOURS).format(DateTimeFormatter.ISO_INSTANT)</span>
+
+<span class="nc" id="L478">        val response = client.search(index) {</span>
+<span class="nc" id="L479">            query = bool {</span>
+<span class="nc" id="L480">                filter(</span>
+<span class="nc" id="L481">                    range(&quot;timestamp&quot;) {</span>
+<span class="nc" id="L482">                        gte = startTimeFormatted</span>
+<span class="nc" id="L483">                        lte = endTimeFormatted</span>
+<span class="nc" id="L484">                    }</span>
+                )
+<span class="nc" id="L486">            }</span>
+<span class="nc" id="L487">            resultSize = 0</span>
+<span class="nc" id="L488">            agg(</span>
+<span class="nc" id="L489">                &quot;location_counts&quot;,</span>
+<span class="nc" id="L490">                TermsAgg(&quot;cluster.node&quot;) {</span>
+<span class="nc" id="L491">                    aggSize = 8</span>
+<span class="nc" id="L492">                }</span>
+            )
+<span class="nc" id="L494">        }</span>
+
+<span class="nc" id="L496">        println(&quot;Response: $response&quot;)</span>
+<span class="nc" id="L497">        println(&quot;Aggregations: ${response.aggregations}&quot;)</span>
+
+        // Extract and parse the aggregation results
+<span class="nc bnc" id="L500" title="All 8 branches missed.">        val buckets = response.aggregations?.get(&quot;location_counts&quot;)?.jsonObject?.get(&quot;buckets&quot;)?.jsonArray</span>
+<span class="nc" id="L501">        val result = mutableMapOf&lt;String, Int&gt;()</span>
+
+<span class="nc bnc" id="L503" title="All 6 branches missed.">        if (buckets.isNullOrEmpty()) {</span>
+<span class="nc" id="L504">            println(&quot;No buckets found.&quot;)</span>
+        } else {
+<span class="nc" id="L506">            buckets.forEach { bucket -&gt;</span>
+<span class="nc" id="L507">                val termsBucket = json.decodeFromJsonElement&lt;TermsBucket&gt;(bucket)</span>
+<span class="nc" id="L508">                result[termsBucket.key] = termsBucket.docCount.toInt()</span>
+<span class="nc" id="L509">            }</span>
+        }
+<span class="nc" id="L511">        result</span>
+<span class="nc" id="L512">    }</span>
+
+<span class="nc" id="L514">    fun countEventsByVulnerability(</span>
+<span class="nc" id="L515">        startTime: String? = null,</span>
+<span class="nc" id="L516">        endTime: String? = null</span>
+<span class="nc" id="L517">    ): Map&lt;String, Int&gt; = runBlocking {</span>
+<span class="nc" id="L518">        val index = &quot;${config.agentData.alertIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc bnc" id="L520" title="All 2 branches missed.">        val endTimeFormatted = endTime ?: ZonedDateTime.now().format(DateTimeFormatter.ISO_INSTANT)</span>
+<span class="nc" id="L521">        val startTimeFormatted =</span>
+<span class="nc bnc" id="L522" title="All 2 branches missed.">            startTime ?: ZonedDateTime.now().minus(196, ChronoUnit.HOURS).format(DateTimeFormatter.ISO_INSTANT)</span>
+
+<span class="nc" id="L524">        val response = client.search(index) {</span>
+<span class="nc" id="L525">            query = bool {</span>
+<span class="nc" id="L526">                filter(</span>
+<span class="nc" id="L527">                    range(&quot;timestamp&quot;) {</span>
+<span class="nc" id="L528">                        gte = startTimeFormatted</span>
+<span class="nc" id="L529">                        lte = endTimeFormatted</span>
+<span class="nc" id="L530">                    }</span>
+                )
+<span class="nc" id="L532">            }</span>
+<span class="nc" id="L533">            resultSize = 0</span>
+<span class="nc" id="L534">            agg(</span>
+<span class="nc" id="L535">                &quot;location_counts&quot;,</span>
+<span class="nc" id="L536">                TermsAgg(&quot;data.vulnerability.severity&quot;) {</span>
+<span class="nc" id="L537">                    aggSize = 8</span>
+<span class="nc" id="L538">                }</span>
+            )
+<span class="nc" id="L540">        }</span>
+
+<span class="nc" id="L542">        println(&quot;Response: $response&quot;)</span>
+<span class="nc" id="L543">        println(&quot;Aggregations: ${response.aggregations}&quot;)</span>
+
+<span class="nc bnc" id="L545" title="All 8 branches missed.">        val buckets = response.aggregations?.get(&quot;location_counts&quot;)?.jsonObject?.get(&quot;buckets&quot;)?.jsonArray</span>
+<span class="nc" id="L546">        val result = mutableMapOf&lt;String, Int&gt;()</span>
+
+<span class="nc bnc" id="L548" title="All 6 branches missed.">        if (buckets.isNullOrEmpty()) {</span>
+<span class="nc" id="L549">            println(&quot;No buckets found.&quot;)</span>
+        } else {
+<span class="nc" id="L551">            buckets.forEach { bucket -&gt;</span>
+<span class="nc" id="L552">                val termsBucket = json.decodeFromJsonElement&lt;TermsBucket&gt;(bucket)</span>
+<span class="nc" id="L553">                result[termsBucket.key] = termsBucket.docCount.toInt()</span>
+<span class="nc" id="L554">            }</span>
+        }
+<span class="nc" id="L556">        result</span>
+<span class="nc" id="L557">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>
