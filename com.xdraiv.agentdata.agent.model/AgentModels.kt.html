@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AgentModels.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">agent-data-api</a> &gt; <a href="index.source.html" class="el_package">com.xdraiv.agentdata.agent.model</a> &gt; <span class="el_source">AgentModels.kt</span></div><h1>AgentModels.kt</h1><pre class="source lang-java linenums">package com.xdraiv.agentdata.agent.model
+
+import com.jillesvangurp.ktsearch.Aggregations
+import com.jillesvangurp.ktsearch.Bucket
+import com.jillesvangurp.ktsearch.getAggResult
+import kotlinx.datetime.Instant
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+
+
+<span class="nc" id="L13">@Serializable</span>
+<span class="fc" id="L14">data class OS(</span>
+<span class="pc" id="L15">    val platform: String</span>
+)
+
+<span class="fc" id="L18">@Serializable</span>
+<span class="pc" id="L19">data class Agent(</span>
+<span class="pc" id="L20">    val id: String,</span>
+<span class="pc" id="L21">    val name: String,</span>
+<span class="pc" id="L22">    val ip: String,</span>
+<span class="pc" id="L23">    val timestamp: Instant,</span>
+<span class="pc" id="L24">    val os: OS? = null,</span>
+<span class="pc" id="L25">    val status: String</span>
+<span class="nc" id="L26">)</span>
+
+<span class="nc" id="L28">@Serializable</span>
+<span class="nc" id="L29">data class TermsBucket(</span>
+<span class="nc" id="L30">    val key: String,</span>
+<span class="nc" id="L31">    @SerialName(&quot;doc_count&quot;)</span>
+    val docCount: Long
+)
+
+<span class="nc" id="L35">@Serializable</span>
+<span class="nc" id="L36">data class TermsAggregationResult(</span>
+<span class="nc" id="L37">    @SerialName(&quot;doc_count_error_upper_bound&quot;)</span>
+    val docCountErrorUpperBound: Long,
+<span class="nc" id="L39">    @SerialName(&quot;sum_other_doc_count&quot;)</span>
+    val sumOtherDocCount: Long,
+<span class="nc" id="L41">    val buckets: List&lt;JsonObject&gt;</span>
+) {
+    val parsedBuckets: List&lt;Bucket&lt;TermsBucket&gt;&gt;
+<span class="nc" id="L44">        get() = buckets.map { Bucket(it, TermsBucket.serializer()) }</span>
+}
+
+<span class="nc" id="L47">fun Aggregations?.termsResult(name: String, json: Json = Json): TermsAggregationResult =</span>
+<span class="nc bnc" id="L48" title="All 4 branches missed.">    this?.getAggResult(name, json) ?: TermsAggregationResult(0, 0, emptyList())</span>
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

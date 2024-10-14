@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AlertLogs.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">agent-data-api</a> &gt; <a href="index.source.html" class="el_package">com.xdraiv.agentdata.alertLogs</a> &gt; <span class="el_source">AlertLogs.kt</span></div><h1>AlertLogs.kt</h1><pre class="source lang-java linenums">package com.xdraiv.agentdata.alertLogs
+
+import kotlinx.serialization.Serializable
+
+<span class="fc" id="L5">@Serializable</span>
+<span class="pc" id="L6">data class AlertLogs(</span>
+<span class="pc" id="L7">    val cluster: Cluster?,</span>
+<span class="pc" id="L8">    val agent: Agent?,</span>
+<span class="pc" id="L9">    val manager: Manager?,</span>
+<span class="pc" id="L10">    val data: Data?,</span>
+<span class="pc" id="L11">    val timestamp: String? = null,</span>
+<span class="pc" id="L12">    val location: String?=null,</span>
+<span class="pc" id="L13">    val rule: Rule?=null,</span>
+<span class="nc" id="L14">)</span>
+
+<span class="nc" id="L16">@Serializable</span>
+<span class="fc" id="L17">data class Cluster(</span>
+<span class="pc" id="L18">    val node: String?</span>
+)
+
+<span class="nc" id="L21">@Serializable</span>
+<span class="pc" id="L22">data class Agent(</span>
+<span class="pc" id="L23">    val ip: String? = null,</span>
+<span class="pc" id="L24">    val name: String?</span>
+<span class="nc" id="L25">)</span>
+
+<span class="nc" id="L27">@Serializable</span>
+<span class="fc" id="L28">data class Manager(</span>
+<span class="pc" id="L29">    val name: String?</span>
+)
+
+<span class="pc" id="L32">@Serializable</span>
+<span class="pc" id="L33">data class Rule(</span>
+<span class="pc" id="L34">    val description: String?=null,</span>
+<span class="pc" id="L35">    val level: Int?,</span>
+<span class="pc" id="L36">    val groups: List&lt;String&gt;? = null</span>
+<span class="nc" id="L37">)</span>
+
+<span class="nc" id="L39">@Serializable</span>
+<span class="fc" id="L40">data class Data(</span>
+<span class="pc" id="L41">    val aws: Aws?</span>
+)
+
+<span class="nc" id="L44">@Serializable</span>
+<span class="fc" id="L45">data class Aws(</span>
+<span class="pc" id="L46">    val accountId: String?,</span>
+<span class="pc" id="L47">    val region: String?</span>
+)
+
+<span class="fc" id="L50">@Serializable</span>
+<span class="fc" id="L51">data class PaginatedResponse&lt;T&gt;(</span>
+<span class="pc" id="L52">    val items: List&lt;T&gt;,</span>
+<span class="pc" id="L53">    val totalItems: Long,</span>
+<span class="pc" id="L54">    val totalPages: Int,</span>
+<span class="pc" id="L55">    val currentPage: Int</span>
+<span class="fc" id="L56">)</span>
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

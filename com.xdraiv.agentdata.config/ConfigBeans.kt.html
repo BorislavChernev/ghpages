@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>ConfigBeans.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">agent-data-api</a> &gt; <a href="index.source.html" class="el_package">com.xdraiv.agentdata.config</a> &gt; <span class="el_source">ConfigBeans.kt</span></div><h1>ConfigBeans.kt</h1><pre class="source lang-java linenums">package com.xdraiv.agentdata.config
+
+import com.typesafe.config.ConfigFactory
+import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Configuration
+import org.springframework.web.servlet.config.annotation.CorsRegistry
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer
+
+<span class="fc" id="L9">@Configuration</span>
+class ConfigBeans : WebMvcConfigurer {
+
+    @Bean
+    fun corsConfigBean(): WebMvcConfigurer {
+<span class="fc" id="L14">        return object : WebMvcConfigurer {</span>
+            override fun addCorsMappings(registry: CorsRegistry) {
+<span class="fc" id="L16">                registry.addMapping(&quot;/**&quot;)  // Apply to all endpoints</span>
+<span class="fc" id="L17">                    .allowedOriginPatterns(&quot;*&quot;)  // Your frontend URL</span>
+<span class="fc" id="L18">                    .allowedMethods(&quot;GET&quot;, &quot;POST&quot;, &quot;PUT&quot;, &quot;DELETE&quot;, &quot;OPTIONS&quot;)  // Allowed HTTP methods</span>
+<span class="fc" id="L19">                    .allowedHeaders(&quot;*&quot;)  // Allow all headers</span>
+<span class="fc" id="L20">                    .allowCredentials(true)  // Allow credentials like cookies or headers</span>
+<span class="fc" id="L21">            }</span>
+        }
+    }
+
+    @Bean
+    fun appConfigBean(): AppConfig {
+<span class="fc" id="L27">        val config = ConfigFactory.load()</span>
+
+        // Load the values from the config file for each parameter
+<span class="fc" id="L30">        return AppConfig(</span>
+<span class="fc" id="L31">            port = config.getInt(&quot;app.port&quot;),  // Port number</span>
+<span class="fc" id="L32">            host = config.getString(&quot;app.host&quot;),</span>
+<span class="fc" id="L33">            googleOauthUrl = config.getString(&quot;app.google-oauth-url&quot;),</span>
+
+            // Load clientDataConfig
+<span class="fc" id="L36">            clientData = ClientDataConfig(</span>
+<span class="fc" id="L37">                url = config.getString(&quot;app.client-data.url&quot;),</span>
+<span class="fc" id="L38">                user = config.getString(&quot;app.client-data.user&quot;),</span>
+<span class="fc" id="L39">                password = config.getString(&quot;app.client-data.password&quot;)</span>
+            ),
+
+            // Load agentDataConfig
+<span class="fc" id="L43">            agentData = AgentDataConfig(</span>
+<span class="fc" id="L44">                host = config.getString(&quot;app.agent-data.host&quot;),</span>
+<span class="fc" id="L45">                port = config.getInt(&quot;app.agent-data.port&quot;),</span>
+<span class="fc" id="L46">                alertIndex = config.getString(&quot;app.agent-data.alert-index&quot;),</span>
+<span class="fc" id="L47">                agentIndex = config.getString(&quot;app.agent-data.agent-index&quot;)</span>
+
+            )
+        )
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>

@@ -1,0 +1,252 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>AgentRepository.kt</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">agent-data-api</a> &gt; <a href="index.source.html" class="el_package">com.xdraiv.agentdata.agent</a> &gt; <span class="el_source">AgentRepository.kt</span></div><h1>AgentRepository.kt</h1><pre class="source lang-java linenums">package com.xdraiv.agentdata.agent
+
+import com.jillesvangurp.ktsearch.*
+import com.jillesvangurp.searchdsls.querydsl.*
+import com.xdraiv.agentdata.agent.model.Agent
+import com.xdraiv.agentdata.agent.model.termsResult
+import com.xdraiv.agentdata.config.AppConfig
+import io.ktor.client.*
+import io.ktor.client.engine.cio.*
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import org.slf4j.LoggerFactory
+import org.springframework.stereotype.Repository
+import java.time.LocalDate
+import java.time.temporal.WeekFields
+import java.util.*
+
+fun TopHitsAggConfig.sourceIncludes(includes: List&lt;String&gt;) {
+<span class="nc" id="L19">	this[&quot;_source&quot;] = mapOf(&quot;includes&quot; to includes)</span>
+<span class="nc" id="L20">}</span>
+
+@Repository
+<span class="fc" id="L23">class AgentRepository(val config: AppConfig) {</span>
+
+<span class="fc" id="L25">	private val logger = LoggerFactory.getLogger(AgentRepository::class.java)</span>
+
+<span class="fc" id="L27">	private val httpClient = HttpClient(CIO) {</span>
+<span class="fc" id="L28">	}</span>
+
+<span class="fc" id="L30">	private val client = SearchClient(</span>
+<span class="fc" id="L31">		KtorRestClient(</span>
+<span class="fc" id="L32">			https = false,</span>
+<span class="fc" id="L33">			nodes = arrayOf(</span>
+<span class="fc" id="L34">				Node(</span>
+<span class="fc" id="L35">					config.agentData.host,</span>
+<span class="fc" id="L36">					config.agentData.port</span>
+				)
+			),
+<span class="fc" id="L39">			client = httpClient</span>
+		)
+	)
+
+<span class="fc" id="L43">	private val json = Json {</span>
+<span class="fc" id="L44">		ignoreUnknownKeys = true</span>
+<span class="fc" id="L45">	}</span>
+
+	fun getCurrentYearAndWeek(): String {
+<span class="nc" id="L48">		val now = LocalDate.now()</span>
+<span class="nc" id="L49">		val weekFields = WeekFields.of(Locale.getDefault())</span>
+<span class="nc" id="L50">		val weekNumber = now.get(weekFields.weekOfWeekBasedYear())</span>
+<span class="nc" id="L51">		val year = now.year</span>
+<span class="nc" id="L52">		return &quot;$year*&quot;</span>
+	}
+
+<span class="nc" id="L55">	fun findByAgentId(id: String): List&lt;Agent&gt; = runBlocking {</span>
+<span class="nc" id="L56">		val index = &quot;${config.agentData.agentIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc" id="L58">		val response = client.search(index) {</span>
+<span class="nc" id="L59">			query = bool {</span>
+<span class="nc" id="L60">				must(</span>
+<span class="nc" id="L61">					term(&quot;id&quot;, id)</span>
+				)
+<span class="nc" id="L63">			}</span>
+<span class="nc" id="L64">		}</span>
+
+<span class="nc" id="L66">		response.hits!!.hits.map { json.decodeFromString&lt;Agent&gt;(it.source.toString()) }</span>
+<span class="nc" id="L67">	}</span>
+
+<span class="nc" id="L69">	fun latestRegisteredAgentName(): String? = runBlocking {</span>
+<span class="nc" id="L70">		val index = &quot;${config.agentData.agentIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc" id="L72">		val response = client.search(index) {</span>
+<span class="nc" id="L73">			query = matchAll()</span>
+<span class="nc" id="L74">			sort {</span>
+<span class="nc" id="L75">				add(&quot;dateAdd&quot;, SortOrder.DESC)</span>
+<span class="nc" id="L76">			}</span>
+<span class="nc" id="L77">			resultSize = 1</span>
+<span class="nc" id="L78">		}</span>
+
+<span class="nc bnc" id="L80" title="All 4 branches missed.">		response.hits!!.hits.firstOrNull()?.source?.let {</span>
+<span class="nc" id="L81">			json.decodeFromString&lt;Agent&gt;(it.toString()).name</span>
+<span class="nc" id="L82">		}</span>
+<span class="nc" id="L83">	}</span>
+
+<span class="nc" id="L85">	fun findAllAgents(): List&lt;Agent&gt; = runBlocking {</span>
+<span class="nc" id="L86">		val index = &quot;${config.agentData.agentIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc" id="L88">		val response = client.search(index) {</span>
+<span class="nc" id="L89">			query = matchAll()</span>
+<span class="nc" id="L90">			resultSize = 1000 // Increase the result size to fetch more data</span>
+<span class="nc" id="L91">		}</span>
+
+<span class="nc" id="L93">		response.hits!!.hits.map { json.decodeFromString&lt;Agent&gt;(it.source.toString()) }</span>
+<span class="nc" id="L94">	}</span>
+
+<span class="nc" id="L96">	fun countAgentsByActivityStatus(): MutableMap&lt;String, Int&gt; = runBlocking {</span>
+<span class="nc" id="L97">		val index = &quot;${config.agentData.agentIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc" id="L99">		val statusCount = mutableMapOf(&quot;active&quot; to 0, &quot;disconnected&quot; to 0, &quot;never_connected&quot; to 0)</span>
+
+<span class="nc" id="L101">		var currentFrom = 0</span>
+<span class="nc" id="L102">		val batchSize = 10000</span>
+<span class="nc" id="L103">		var totalResults: Long</span>
+
+		do {
+<span class="nc" id="L106">			val response = client.search(index) {</span>
+<span class="nc" id="L107">				query = bool {</span>
+<span class="nc" id="L108">					filter(range(&quot;timestamp&quot;) {</span>
+<span class="nc" id="L109">						gte = &quot;now-1w&quot;</span>
+<span class="nc" id="L110">					})</span>
+<span class="nc" id="L111">				}</span>
+<span class="nc" id="L112">				resultSize = batchSize</span>
+<span class="nc" id="L113">				from = currentFrom</span>
+<span class="nc" id="L114">				agg(&quot;by_agent&quot;, TermsAgg(&quot;id&quot;) {</span>
+<span class="nc" id="L115">					aggSize = batchSize.toLong()</span>
+<span class="nc" id="L116">				}) {</span>
+<span class="nc" id="L117">					agg(&quot;latest_status&quot;, TopHitsAgg {</span>
+<span class="nc" id="L118">						resultSize = 1</span>
+<span class="nc" id="L119">						sort {</span>
+<span class="nc" id="L120">							add(&quot;timestamp&quot;)</span>
+<span class="nc" id="L121">						}</span>
+<span class="nc" id="L122">						sourceIncludes(listOf(&quot;status&quot;, &quot;timestamp&quot;))</span>
+<span class="nc" id="L123">					})</span>
+<span class="nc" id="L124">				}</span>
+<span class="nc" id="L125">			}</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">			totalResults = response.hits!!.total?.value ?: 0</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">			val byAgent = response.aggregations?.termsResult(&quot;by_agent&quot;)</span>
+
+<span class="nc bnc" id="L129" title="All 4 branches missed.">			byAgent?.parsedBuckets?.forEach { bucket -&gt;</span>
+<span class="nc" id="L130">				val topHits = bucket.aggregations.topHitResult(&quot;latest_status&quot;)</span>
+<span class="nc bnc" id="L131" title="All 8 branches missed.">				val status = topHits.hits.hits.firstOrNull()?.source?.get(&quot;status&quot;)?.toString()?.replace(&quot;\&quot;&quot;, &quot;&quot;)</span>
+
+<span class="nc bnc" id="L133" title="All 2 branches missed.">				if (status != null) {</span>
+<span class="nc" id="L134">					statusCount[status] = statusCount.getOrDefault(status, 0) + 1</span>
+				}
+<span class="nc" id="L136">			}</span>
+
+<span class="nc" id="L138">			currentFrom += batchSize</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">		} while (currentFrom &lt; totalResults)</span>
+
+<span class="nc" id="L141">		logger.info(&quot;Status Count: $statusCount&quot;)</span>
+<span class="nc" id="L142">		statusCount</span>
+<span class="nc" id="L143">	}</span>
+
+<span class="nc" id="L145">	fun countAgentsByOS(): MutableMap&lt;String, Int&gt; = runBlocking {</span>
+<span class="nc" id="L146">		val index = &quot;${config.agentData.agentIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc" id="L148">		val platformCount = mutableMapOf(&quot;windows&quot; to 0, &quot;ubuntu&quot; to 0, &quot;darwin&quot; to 0)</span>
+
+<span class="nc" id="L150">		var currentFrom = 0</span>
+<span class="nc" id="L151">		val batchSize = 10000</span>
+<span class="nc" id="L152">		var totalResults: Long</span>
+
+		do {
+<span class="nc" id="L155">			val response = client.search(index) {</span>
+<span class="nc" id="L156">				query = bool {</span>
+<span class="nc" id="L157">					filter(range(&quot;timestamp&quot;) {</span>
+<span class="nc" id="L158">						gte = &quot;now-1w&quot;</span>
+<span class="nc" id="L159">					})</span>
+<span class="nc" id="L160">				}</span>
+<span class="nc" id="L161">				resultSize = batchSize</span>
+<span class="nc" id="L162">				from = currentFrom</span>
+<span class="nc" id="L163">				agg(&quot;by_os&quot;, TermsAgg(&quot;id&quot;) {</span>
+<span class="nc" id="L164">					aggSize = batchSize.toLong()</span>
+<span class="nc" id="L165">				}) {</span>
+<span class="nc" id="L166">					agg(&quot;latest_os&quot;, TopHitsAgg {</span>
+<span class="nc" id="L167">						resultSize = 1</span>
+<span class="nc" id="L168">						sort {</span>
+<span class="nc" id="L169">							add(&quot;timestamp&quot;)</span>
+<span class="nc" id="L170">						}</span>
+<span class="nc" id="L171">						sourceIncludes(listOf(&quot;os.platform&quot;, &quot;timestamp&quot;))</span>
+<span class="nc" id="L172">					})</span>
+<span class="nc" id="L173">				}</span>
+<span class="nc" id="L174">			}</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">			totalResults = response.hits!!.total?.value ?: 0</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">			val byOS = response.aggregations?.termsResult(&quot;by_os&quot;)</span>
+<span class="nc bnc" id="L177" title="All 4 branches missed.">			byOS?.parsedBuckets?.forEach { bucket -&gt;</span>
+<span class="nc" id="L178">				val topHits = bucket.aggregations.topHitResult(&quot;latest_os&quot;)</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">				val sourceMap = topHits.hits.hits.firstOrNull()?.source</span>
+<span class="nc bnc" id="L180" title="All 10 branches missed.">				val platform = (sourceMap?.get(&quot;os&quot;) as? Map&lt;*, *&gt;)?.get(&quot;platform&quot;)?.toString()?.replace(&quot;\&quot;&quot;, &quot;&quot;)</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">				platform?.let {</span>
+					// Normalize platform names to match the keys in platformCount
+<span class="nc bnc" id="L183" title="All 5 branches missed.">					val normalizedPlatform = when(it.lowercase()) {</span>
+<span class="nc" id="L184">						&quot;windows&quot; -&gt; &quot;windows&quot;</span>
+<span class="nc" id="L185">						&quot;ubuntu&quot; -&gt; &quot;ubuntu&quot;</span>
+<span class="nc" id="L186">						&quot;darwin&quot; -&gt; &quot;darwin&quot;</span>
+<span class="nc" id="L187">						&quot;macos&quot; -&gt; &quot;macOS&quot;</span>
+<span class="nc" id="L188">						else -&gt; null</span>
+					}
+<span class="nc bnc" id="L190" title="All 2 branches missed.">					normalizedPlatform?.let { normalized -&gt;</span>
+<span class="nc" id="L191">						platformCount[normalized] = platformCount.getOrDefault(normalized, 0) + 1</span>
+<span class="nc" id="L192">					}</span>
+<span class="nc" id="L193">				}</span>
+<span class="nc" id="L194">			}</span>
+
+<span class="nc" id="L196">			currentFrom += batchSize</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">		} while (currentFrom &lt; totalResults)</span>
+
+<span class="nc" id="L199">		logger.info(&quot;Status Count: $platformCount&quot;)</span>
+<span class="nc" id="L200">		platformCount</span>
+<span class="nc" id="L201">	}</span>
+
+	fun countConnectedAgents(): Int {
+<span class="nc bnc" id="L204" title="All 2 branches missed.">		return countAgentsByActivityStatus()[&quot;active&quot;] ?: 0</span>
+	}
+
+	fun countDisconnectedAgents(): Int {
+<span class="nc bnc" id="L208" title="All 2 branches missed.">		return countAgentsByActivityStatus()[&quot;disconnected&quot;] ?: 0</span>
+	}
+
+	fun countNeverConnectedAgents(): Int {
+<span class="nc bnc" id="L212" title="All 2 branches missed.">		return countAgentsByActivityStatus()[&quot;never_connected&quot;] ?: 0</span>
+	}
+
+<span class="nc" id="L215">	fun listAgents(): List&lt;String&gt; = runBlocking {</span>
+<span class="nc" id="L216">		val index = &quot;${config.agentData.agentIndex}${getCurrentYearAndWeek()}&quot;</span>
+
+<span class="nc" id="L218">		val agentNames = mutableSetOf&lt;String&gt;() // Using a Set to ensure uniqueness</span>
+
+<span class="nc" id="L220">		var currentFrom = 0</span>
+<span class="nc" id="L221">		val batchSize = 1000</span>
+<span class="nc" id="L222">		var totalResults: Long</span>
+
+		do {
+<span class="nc" id="L225">			val response = client.search(index) {</span>
+<span class="nc" id="L226">				query = bool {</span>
+<span class="nc" id="L227">					filter(range(&quot;timestamp&quot;) {</span>
+<span class="nc" id="L228">						gte = &quot;now-6h&quot;</span>
+<span class="nc" id="L229">					})</span>
+<span class="nc" id="L230">				}</span>
+<span class="nc" id="L231">				resultSize = batchSize</span>
+<span class="nc" id="L232">				from = currentFrom</span>
+<span class="nc" id="L233">			}</span>
+
+<span class="nc bnc" id="L235" title="All 2 branches missed.">			totalResults = response.hits!!.total?.value ?: 0</span>
+
+			// Extract agent names from the hits and add them to the Set
+<span class="nc" id="L238">			response.hits!!.hits.forEach { hit -&gt;</span>
+<span class="nc bnc" id="L239" title="All 6 branches missed.">				hit.source?.get(&quot;name&quot;)?.toString()?.replace(&quot;\&quot;&quot;, &quot;&quot;).let {</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">					if (it != null) {</span>
+<span class="nc" id="L241">						agentNames.add(it)</span>
+					}
+<span class="nc" id="L243">				}</span>
+<span class="nc" id="L244">			}</span>
+
+<span class="nc" id="L246">			currentFrom += batchSize</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">		} while (currentFrom &lt; totalResults)</span>
+
+<span class="nc" id="L249">		agentNames.toList()</span>
+<span class="nc" id="L250">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.10.202304240956</span></div></body></html>
